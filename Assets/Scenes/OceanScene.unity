@@ -204,13 +204,63 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
+  m_LocalRotation: {x: 0.39044833, y: 0.34682897, z: -0.161729, w: 0.8373192}
+  m_LocalPosition: {x: -22, y: 65, z: -17}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 50, y: 45, z: 0}
+--- !u!1 &1789179191
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1789179192}
+  - component: {fileID: 1789179193}
+  m_Layer: 0
+  m_Name: OceanSettings
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1789179192
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1789179191}
+  serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 5, z: -10}
+  m_LocalPosition: {x: 0, y: -0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1789179193
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1789179191}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46149f5e1b66523429a724e9b8c04f73, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OceanSettings
+  meshRenderer: {fileID: 1792305460}
+  waveCount: 16
+  seed: 12345
+  amplitudeRange: {x: 0.1, y: 0.4}
+  wavelengthRange: {x: 12, y: 24}
+  speedRange: {x: 0.5, y: 2}
 --- !u!1 &1792305458
 GameObject:
   m_ObjectHideFlags: 0
@@ -314,8 +364,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8294290185242b942b0f3bc16d3cf0aa, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OceanGrid
-  resolution: 200
-  length: 200
+  resolution: 100
+  length: 100
+  meshFilter: {fileID: 1792305461}
 --- !u!1 &2034437336
 GameObject:
   m_ObjectHideFlags: 0
@@ -341,7 +392,7 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2034437336}
   m_Enabled: 1
-  serializedVersion: 13
+  serializedVersion: 12
   m_Type: 1
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 1
@@ -393,7 +444,7 @@ Light:
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1
   m_ForceVisible: 0
-  m_ShapeRadius: 0.025
+  m_ShadowRadius: 0
   m_ShadowAngle: 0
   m_LightUnit: 1
   m_LuxAtDistance: 1
@@ -407,7 +458,7 @@ Transform:
   m_GameObject: {fileID: 2034437336}
   serializedVersion: 2
   m_LocalRotation: {x: 0.40821788, y: -0.23456968, z: 0.10938163, w: 0.8754261}
-  m_LocalPosition: {x: 23.09306, y: -0, z: 5.25605}
+  m_LocalPosition: {x: 0, y: -0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -420,3 +471,4 @@ SceneRoots:
   - {fileID: 963194228}
   - {fileID: 1792305459}
   - {fileID: 2034437338}
+  - {fileID: 1789179192}

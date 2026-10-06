@@ -8,6 +8,8 @@ public class OceanGrid : MonoBehaviour
     [SerializeField] private int resolution = 100;
     [SerializeField] private float length = 100f;
 
+    [SerializeField] private MeshFilter meshFilter;
+
     private const int spacePerQuad = 6; // 1 quad needs space for 2 tris. each tri is 3 pts,
                                         // we store the index of each pt for re-use
 
@@ -40,8 +42,8 @@ public class OceanGrid : MonoBehaviour
 
                 // - 0.5f offsets the point to 50% in the negative direction such that the
                 //   center is the origin instead of the bottom left
-                float worldX = (percentX - 0.5f) * length;
-                float worldZ = (percentZ - 0.5f) * length;
+                float worldX = (percentX - 0.1f) * length; // 50% from edge
+                float worldZ = (percentZ - 0.1f) * length; // 10% from edge
 
                 vertices[index] = new Vector3(worldX, 0f, worldZ);
             }
@@ -89,6 +91,6 @@ public class OceanGrid : MonoBehaviour
 
         mesh.RecalculateNormals();
 
-        GetComponent<MeshFilter>().mesh = mesh;
+        meshFilter.mesh = mesh;
     }
 }
