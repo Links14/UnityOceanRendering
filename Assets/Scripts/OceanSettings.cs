@@ -10,21 +10,51 @@ public class OceanSettings : MonoBehaviour
     public struct Wave
     {
         public float amplitude;
-        public float wavelength;
+        public float frequency;
         public float speed;
         public Vector2 direction;
     }
 
     [Header("Reference Parameters")]
     // The MeshRenderer whose material will recieve the wave buffer
-    [SerializeField] private MeshRenderer meshRenderer;
+    [SerializeField]
+    private MeshRenderer meshRenderer;
+
+    [Header("Wave Settings")]
+    [SerializeField, Min(0)]
+    private int waveCount = 6;
+    [SerializeField, Min(0.01f)]
+    private float baseAmplitude = 0.5f;
+
+    // Spacial Frequency in cycles per world Unit
+    // 0.04 means a wavelength of 25 world units.
+    [SerializeField, Min(0.001f)]
+    private float baseFrequency = 0.04f;
+    [SerializeField, Min(1f)]
+    private float frequencyMultiplier = 1.16f;
+    [SerializeField, Range(0.1f, 1f)]
+    private float amplitudeMultiplier = 0.83f;
+
+    // 1 is the baseline amplitude-to-wavelength relationship
+    [SerializeField, Range(0.1f, 5f)]
+    private float amplitudeRatio = 1f;
+
+    [SerializeField]
+    private float baseSpeed = 1f;
+    
+    [Header("Visual Settings")]
+    [SerializeField, Min(4f)]
+    private float shininess = 64f;
+    [SerializeField, Range(0f, 1f)]
+    private float warpStrength = 0.25f;
 
     [Header("Generation Parameters")]
-    [SerializeField] private int waveCount = 0;
-    [SerializeField] private int seed = 12345;
-    [SerializeField] private Vector2 amplitudeRange;
-    [SerializeField] private Vector2 wavelengthRange;
-    [SerializeField] private Vector2 speedRange;
+    [Range(10000, 99999)]
+    [SerializeField]
+    private int seed = 12345;
+
+
+    
 
 
     // GPU buffer containg our wave structs
@@ -48,6 +78,12 @@ public class OceanSettings : MonoBehaviour
 
         // Tell the shader how many waves are in the buffer
         meshRenderer.material.SetInt("_WaveCount", waves.Length);
+
+        // set the specular highlighting sharpness
+        meshRenderer.material.SetFloat("_Shininess", shininess);
+
+        // set the domain warping ration - effect of previous wave movement on new waves
+        meshRenderer.material.SetFloat("_WarpStrength", warpStrength);
     }
 
 
@@ -62,15 +98,25 @@ public class OceanSettings : MonoBehaviour
         // Generate waves independently
         for (int i = 0; i < waveCount; i++)
         {
+            // Each iteration adds a higher-frequency layer
+            float freq = baseFrequency * Mathf.Pow(frequencyMultiplier, i);
+
+            // Keep amplitude proportional to wavelength
+            // Apply fBm amplitude falloff
+            float amp = baseAmplitude
+                * (baseFrequency / freq)
+                * Mathf.Pow(amplitudeMultiplier, i)
+                * amplitudeRatio;
+
             // random angle around the circle
-            float angle = RandomRange(random, 0f, Mathf.PI * 2f);
+            float angle = (float)random.NextDouble()
+                * Mathf.PI * 2f;
 
             waves[i] = new()
             {
-                amplitude = RandomRange(random, amplitudeRange.x, amplitudeRange.y),
-                wavelength = RandomRange(random, wavelengthRange.x, wavelengthRange.y),
-                speed = RandomRange(random, speedRange.x, speedRange.y),
-
+                amplitude = amp,
+                frequency = freq,
+                speed = baseSpeed,
                 direction = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle))
             };
         }
@@ -85,6 +131,11 @@ public class OceanSettings : MonoBehaviour
 
         // remap [0, 1) to [min, max)
         return Mathf.Lerp(min, max, normalized);
+    }
+
+    public void RandomizeSeed()
+    {
+        seed = Random.Range(10000, 100000);
     }
 
     private void OnDestroy()

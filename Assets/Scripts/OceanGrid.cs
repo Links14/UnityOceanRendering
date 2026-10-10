@@ -35,15 +35,14 @@ public class OceanGrid : MonoBehaviour
         {
             for (int col = 0; col < verticiesPerSide; col++)
             {
-                int index = col * verticiesPerSide + row;
+                int index = row * verticiesPerSide + col;
 
                 float percentX = (float)col / resolution;
                 float percentZ = (float)row / resolution;
 
-                // - 0.5f offsets the point to 50% in the negative direction such that the
-                //   center is the origin instead of the bottom left
-                float worldX = (percentX - 0.1f) * length; // 50% from edge
-                float worldZ = (percentZ - 0.1f) * length; // 10% from edge
+                // Offset to the bottom left by 10% so the main camera has a full filled view
+                float worldX = (percentX - 0.1f) * length;
+                float worldZ = (percentZ - 0.1f) * length;
 
                 vertices[index] = new Vector3(worldX, 0f, worldZ);
             }
@@ -64,30 +63,31 @@ public class OceanGrid : MonoBehaviour
                 int topRight = topLeft + 1; // in the row above and one to the right of the current index
 
                 // split into triangles
-                // create lower left triangle - counter-clockwise winding
+                // create lower left triangle - clockwise winding
                 triangles[triangleIndex] = topLeft;
+                triangleIndex++;
+                triangles[triangleIndex] = bottomRight;
                 triangleIndex++;
                 triangles[triangleIndex] = bottomLeft;
                 triangleIndex++;
-                triangles[triangleIndex] = bottomRight;
-                triangleIndex++;
 
-                // create upper right triangle - counter-clockwise winding
+                // create upper right triangle - clockwise winding
                 triangles[triangleIndex] = topLeft;
                 triangleIndex++;
-                triangles[triangleIndex] = bottomRight;
-                triangleIndex++;
                 triangles[triangleIndex] = topRight;
+                triangleIndex++;
+                triangles[triangleIndex] = bottomRight;
                 triangleIndex++;
             }
         }
 
-        Mesh mesh = new()
-        {
-            name = "Ocean Grid",
-            vertices = vertices,
-            triangles = triangles
-        };
+        Mesh mesh = new();
+        mesh.name = "Ocean Grid";
+
+        mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+
+        mesh.vertices = vertices;
+        mesh.triangles = triangles;
 
         mesh.RecalculateNormals();
 

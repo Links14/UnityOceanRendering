@@ -26,7 +26,7 @@ Shader "Ocean/Basic"
             struct Wave
             {
                 float amplitude;
-                float wavelength;
+                float frequency;
                 float speed;
                 float2 direction;
             };
@@ -37,6 +37,11 @@ Shader "Ocean/Basic"
             // Number of waves currently stored in the buffer
             int _WaveCount;
 
+            // controls the sharpness of the specular highlights
+            float _Shininess;
+            
+            // Control how strongerly earlier waves distort later waves;
+            float _WarpStrength = 0.25f; // domain warping
 
             /// Vertex Input
 
@@ -55,6 +60,7 @@ Shader "Ocean/Basic"
                 float4 position : SV_POSITION;
                 // normal vector
                 float3 normal : TEXCOORD0;
+                float3 worldPosition : TEXCOORD1;
             };
 
             /// Vertex Shader
@@ -69,7 +75,6 @@ Shader "Ocean/Basic"
                 // Start with vertex position from mesh
                 float3 position = input.position.xyz;
 
-
                 /// Wave Calculator
 
                 // Accumulate the contribution from every wave
@@ -80,6 +85,9 @@ Shader "Ocean/Basic"
                 float slopeX = 0.0;
                 float slopeZ = 0.0;
 
+                // Position where wave functions are evalutated
+                // Initially starts as the vertex's original XZ position
+                float2 samplePosition = position.xz;
 
                 // iterate waves in buffer
                 for (int i = 0; i < _WaveCount; i++) 
@@ -90,34 +98,44 @@ Shader "Ocean/Basic"
                     // normalize dir
                     float2 dir = normalize(wave.direction);
 
-                    // Convert wavelength into wave Number
-                    // A shorter wavelength means the waves oscillate more quickly across space
-                    float waveNumber = 2.0 * UNITY_PI / wave.wavelength;
+                    // Convert frequency into wave Number
+                    // A higher frequency means the waves oscillate more quickly across space
+                    float waveNumber = 2.0 * UNITY_PI * wave.frequency;
 
                     // Find where this vertex is along the wave's direction.
-                    float distance = dot(position.xz, dir);
+                    float distance = dot(samplePosition, dir);
 
                     // Calculate current wave phase
                     float phase = waveNumber * distance + wave.speed * t;
 
                     // calculate sine once
-                    float sine = exp(sin(phase));
+                    float sine = sin(phase);
                     // calculate cosine once
-                    float cosine = exp(cos(phase));
+                    float cosine = cos(phase);
+                    // eular wave
+                    float expSine = exp(sine);
 
                     /// height
 
                     // Add this wave's vertical displacement
-                    // Multiple waves are added togheter
-                    height += wave.amplitude * sine;
+                    // Multiple waves are added togther
+                    height += wave.amplitude * (expSine - 1.266);
+                    // subtract half of e height as an offset
+                    // center waves around 0
 
+
+                    // general derivative
+                    float derivative = wave.amplitude * expSine * cosine;
 
                     /// surface slope
 
                     // Calculate how quickly height changes in xz dir
                     // partial derivatives
-                    slopeX += wave.amplitude * waveNumber * dir.x * cosine;
-                    slopeZ += wave.amplitude * waveNumber * dir.y * cosine;
+                    slopeX += derivative * waveNumber * dir.x;
+                    slopeZ += derivative * waveNumber * dir.y;
+
+                    // Use the accumulated slope to warp the sampling position for subsequent waves.
+                    samplePosition += _WarpStrength * float2(slopeX, slopeZ);
                 }
 
                 // Move the vertex vertically according to all waves.
@@ -135,6 +153,8 @@ Shader "Ocean/Basic"
                 output.normal = UnityObjectToWorldNormal(normal);
                 // position in clip space
                 output.position = UnityObjectToClipPos(float4(position, 1.0));
+                // world position in world space
+                output.worldPosition = mul(unity_ObjectToWorld, float4(position, 1.0)).xyz;
 
                 return output;
             }
@@ -146,6 +166,23 @@ Shader "Ocean/Basic"
                 // dir from surface toward the light source
                 float3 lightDir = normalize(_WorldSpaceLightPos0.xyz);
 
+                // point to camera direction
+                float3 viewDir = normalize(_WorldSpaceCameraPos - input.worldPosition);
+
+
+                // Blinn-Phong highlight
+                float specularStrength = 0.75;
+                float ambientStrength = 0.0f;
+
+                // Halfway dir between lightDir and viewDir
+                float3 halfwayDir = normalize(lightDir + viewDir);
+
+                // Specular highlight strength
+                float specular = pow(
+                    max(0.0, dot(normalize(input.normal), halfwayDir)),
+                    _Shininess
+                );
+
 
                 // Lambertian diffuse lighting
                 // dot product measures how directly the surface faces the light
@@ -153,10 +190,12 @@ Shader "Ocean/Basic"
                 float diffuse = max(0, dot(input.normal, lightDir));
 
                 // base color
-                float3 waterColor = float3(0.0, 0.5, 1.0);
+                float3 waterColor = float3(0.03, 0.09, 0.15);
 
                 // Apply lambertian lighting to color
-                float3 finalColor = waterColor * diffuse;
+                float3 finalColor = 
+                    waterColor * (diffuse + ambientStrength) +
+                    specularStrength * specular;
 
                 return float4(finalColor, 1);
             }
