@@ -31,17 +31,45 @@ Shader "Ocean/Basic"
                 float2 direction;
             };
 
-            // GPU buffer containing waves
-            StructuredBuffer<Wave> _Waves;
+            // Vertex modifiers
+            int _VertexWaveCount;
+            float _VertexSeed;
+            float _VertexSeedIter;
 
-            // Number of waves currently stored in the buffer
-            int _WaveCount;
+            float _VertexFrequency;
+            float _VertexFrequencyMult;
 
-            // controls the sharpness of the specular highlights
+            float _VertexAmplitude;
+            float _VertexAmplitudeMult;
+
+            float _VertexMaxPeak;
+            float _VertexPeakOffset;
+
+            float _VertexInitialSpeed;
+            float _VertexSpeedRamp;
+
+            float _VertexDrag;
+            float _VertexHeight;
+
+            // Fragment modifiers
+            float _FragmentSeed;
+            float _FragmentSeedIter;
+            float _FragmentFrequency;
+            float _FragmentFrequencyMult;
+            float _FragmentAmplitude;
+            float _FragmentAmplitudeMult;
+            float _FragmentMaxPeak;
+            float _FragmentPeakOffset;
+            float _FragmentInitialSpeed;
+            float _FragmentSpeedRamp;
+            float _FragmentDrag;
+            float _FragmentHeight;
+
+            // Lighting
+            float _NormalStrength;
+            // control sharpness of specular glare // higher values = tighter spread
             float _Shininess;
-            
-            // Control how strongerly earlier waves distort later waves;
-            float _WarpStrength = 0.25f; // domain warping
+
 
             /// Vertex Input
 
@@ -62,6 +90,89 @@ Shader "Ocean/Basic"
                 float3 normal : TEXCOORD0;
                 float3 worldPosition : TEXCOORD1;
             };
+            
+            // ---------------------------------------------------------
+            // fBm / exponential-sine wave calculation
+            //
+            // Returns:
+            // x = accumulated wave height
+            // y = derivative in X
+            // z = derivative in Z
+            // ---------------------------------------------------------
+
+            float3 vertexFBM(float3 vertexPosition)
+            {
+                float frequency = _VertexFrequency;
+                float amplitude = _VertexAmplitude;
+                float speed = _VertexInitialSpeed;
+                float seed = _VertexSeed;
+
+                // Sampling position changes as each wave warps
+                // the domain used by subsequent waves
+                float2 samplePosition = vertexPosition.xz;
+
+                float height = 0.0;
+                float2 derivativeSum = float2(0.0, 0.0);
+                float amplitudeSum = 0.0;
+
+                for (int i = 0; i < _VertexWaveCount; i++) 
+                {
+                    // Deterministic direction derived from the seed
+                    // The same settings produce the same directions
+                    float2 direction = normalize(
+                        float2(cos(seed), sin(seed))
+                    );
+
+                    // Angular spatial frequency, in radians per unit
+                    float phase =
+                        dot(direction, samplePosition) * frequency
+                        + _Time.y * speed;
+
+                    float sine = sin(phase);
+                    float cosine = cos(phase);
+
+                    // Euler's Wave
+                    float wave = amplitude
+                        * exp(_VertexMaxPeak * sine - _VertexPeakOffset);
+
+                    // Derivative with respect to phase
+                    float waveDerivative = _VertexMaxPeak * wave * cosine;
+
+                    // Spatial Derivative: d(height) / d(x, z)
+                    float2 waveSlope = frequency * direction * waveDerivative;
+
+                    height += wave;
+
+                    // Accumulate derivatives for the surface normal
+                    derivativeSum += waveSlope;
+
+                    // Progressive domain warping:
+                    // later waves sample a displaced XZ POSITION
+                    samplePosition += -waveSlope * amplitude * _VertexDrag;
+
+                    amplitudeSum += amplitude;
+
+                    // Advance parameters for the next fBm layer
+                    frequency *= _VertexFrequencyMult;
+                    amplitude *= _VertexAmplitudeMult;
+                    speed *= _VertexSpeedRamp;
+                    seed += _VertexSeedIter;
+                }
+
+                // Avoid division by zero if configured with no waves (edge-case)
+                if (amplitudeSum > 0.00001) 
+                {
+                    height /= amplitudeSum;
+                    derivativeSum /= amplitudeSum;
+                }
+
+                // Apply overall vertical scale consistently to both
+                height *= _VertexHeight;
+                derivativeSum *= _VertexHeight;
+
+                return float3(height, derivativeSum.x, derivativeSum.y);
+            }
+
 
             /// Vertex Shader
 
@@ -75,86 +186,24 @@ Shader "Ocean/Basic"
                 // Start with vertex position from mesh
                 float3 position = input.position.xyz;
 
-                /// Wave Calculator
+                // evaluate fBm
+                float3 fBm = vertexFBM(position);
 
-                // Accumulate the contribution from every wave
-                float height = 0.0;
+                // Apply vertical displacement
+                position.y += fBm.x;
 
-                // These represent how steep the surface is in the
-                // X and Z directions
-                float slopeX = 0.0;
-                float slopeZ = 0.0;
+                // For y = height(x, z), the surface normal is
+                //  proportional to (-dh/dx, 1, -dh/dz)
+                float3 objectNormal = normalize(
+                    float3(-fBm.y, 1.0, -fBm.z)
+                );
 
-                // Position where wave functions are evalutated
-                // Initially starts as the vertex's original XZ position
-                float2 samplePosition = position.xz;
-
-                // iterate waves in buffer
-                for (int i = 0; i < _WaveCount; i++) 
-                {
-                    // Get wave from buffer
-                    Wave wave = _Waves[i];
-
-                    // normalize dir
-                    float2 dir = normalize(wave.direction);
-
-                    // Convert frequency into wave Number
-                    // A higher frequency means the waves oscillate more quickly across space
-                    float waveNumber = 2.0 * UNITY_PI * wave.frequency;
-
-                    // Find where this vertex is along the wave's direction.
-                    float distance = dot(samplePosition, dir);
-
-                    // Calculate current wave phase
-                    float phase = waveNumber * distance + wave.speed * t;
-
-                    // calculate sine once
-                    float sine = sin(phase);
-                    // calculate cosine once
-                    float cosine = cos(phase);
-                    // eular wave
-                    float expSine = exp(sine);
-
-                    /// height
-
-                    // Add this wave's vertical displacement
-                    // Multiple waves are added togther
-                    height += wave.amplitude * (expSine - 1.266);
-                    // subtract half of e height as an offset
-                    // center waves around 0
-
-
-                    // general derivative
-                    float derivative = wave.amplitude * expSine * cosine;
-
-                    /// surface slope
-
-                    // Calculate how quickly height changes in xz dir
-                    // partial derivatives
-                    slopeX += derivative * waveNumber * dir.x;
-                    slopeZ += derivative * waveNumber * dir.y;
-
-                    // Use the accumulated slope to warp the sampling position for subsequent waves.
-                    samplePosition += _WarpStrength * float2(slopeX, slopeZ);
-                }
-
-                // Move the vertex vertically according to all waves.
-                position.y += height;
-
-                /// Calculate normal
-                // calculate tangents
-                float3 tangentX = normalize(float3(1, slopeX, 0));
-                float3 tangentZ = normalize(float3(0, slopeZ, 1));
-
-                // normal
-                float3 normal = normalize(cross(tangentZ, tangentX));
-
-                // normal to world space
-                output.normal = UnityObjectToWorldNormal(normal);
                 // position in clip space
                 output.position = UnityObjectToClipPos(float4(position, 1.0));
-                // world position in world space
+                // position in world space
                 output.worldPosition = mul(unity_ObjectToWorld, float4(position, 1.0)).xyz;
+                // object normal
+                output.normal = UnityObjectToWorldNormal(objectNormal);
 
                 return output;
             }
@@ -163,19 +212,18 @@ Shader "Ocean/Basic"
 
             float4 frag(Varyings input) : SV_Target 
             {
-                // dir from surface toward the light source
+                // normal from vertex shader
+                float3 normal = normalize(input.normal);
+                // direction from surface toward the light source
                 float3 lightDir = normalize(_WorldSpaceLightPos0.xyz);
-
                 // point to camera direction
                 float3 viewDir = normalize(_WorldSpaceCameraPos - input.worldPosition);
 
+                float3 halfwayDir = normalize(lightDir + viewDir);
 
                 // Blinn-Phong highlight
                 float specularStrength = 0.75;
                 float ambientStrength = 0.0f;
-
-                // Halfway dir between lightDir and viewDir
-                float3 halfwayDir = normalize(lightDir + viewDir);
 
                 // Specular highlight strength
                 float specular = pow(
@@ -183,21 +231,20 @@ Shader "Ocean/Basic"
                     _Shininess
                 );
 
-
                 // Lambertian diffuse lighting
                 // dot product measures how directly the surface faces the light
                 // max() prevents the surface from becoming negatively lit when facing away from the light
-                float diffuse = max(0, dot(input.normal, lightDir));
+                float diffuse = max(0, dot(normal, lightDir));
 
                 // base color
                 float3 waterColor = float3(0.03, 0.09, 0.15);
 
                 // Apply lambertian lighting to color
                 float3 finalColor = 
-                    waterColor * (diffuse + ambientStrength) +
-                    specularStrength * specular;
+                    waterColor * (diffuse + ambientStrength)
+                    + specularStrength * specular;
 
-                return float4(finalColor, 1);
+                return float4(finalColor, 1.0);
             }
 
             // end computer graphics program code
