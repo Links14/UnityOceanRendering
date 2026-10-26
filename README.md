@@ -41,5 +41,5 @@ normals, lighting, etc.
 
 ## References
 
-- GPU Gems...
-- Acerola...
+- [GPU Gems - Chapter 1. Effective Water Simulation from Physical Models...](https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-1-effective-water-simulation-physical-models)
+- [Acerola - How Games Fake Water...](https://youtu.be/PH9q0HNBjT4)
