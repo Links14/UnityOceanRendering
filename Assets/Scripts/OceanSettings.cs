@@ -63,7 +63,7 @@ public class OceanSettings : MonoBehaviour
     //private int seed = 12345;
 
     [Header("Vertex Settings")]
-    [SerializeField, Range(1, 32)]
+    [SerializeField, Range(0, 32)]
     private int vertexWaveCount = 8;
     [SerializeField]
     private float vertexSeed = 4f;
@@ -96,6 +96,8 @@ public class OceanSettings : MonoBehaviour
     [Space]
 
     [Header("Fragment Settings")]
+    [SerializeField, Range(0, 64)]
+    private int fragmentWaveCount = 8;
     [SerializeField]
     private float fragmentSeed = 4f;
     [SerializeField]
@@ -210,6 +212,7 @@ public class OceanSettings : MonoBehaviour
         oceanMaterial.SetFloat("_VertexHeight", vertexHeight);
 
         // Fragment-stage wave and normal parameters.
+        oceanMaterial.SetInt("_FragmentWaveCount", fragmentWaveCount);
         oceanMaterial.SetFloat("_FragmentSeed", fragmentSeed); // randomized seed
         oceanMaterial.SetFloat("_FragmentSeedIter", fragmentSeedIterator);
         oceanMaterial.SetFloat("_FragmentFrequency", fragmentFrequency);
@@ -273,6 +276,7 @@ public class OceanSettings : MonoBehaviour
         fragmentSeed = UnityEngine.Random.Range(1f, 100f);
         vertexSeed = fragmentSeed;
         //seed = UnityEngine.Random.Range(10000, 100000);
+        StartSimulation();
     }
 
     //private void OnDestroy()

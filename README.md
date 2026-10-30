@@ -4,7 +4,7 @@ A real-time procedural ocean simulation built in Unity using handwritten HLSL.
 
 ## Demo
 
-[video/player here]
+<video src="Ocean-Ver-A.0.mp4" width="640" height="220" controls></video>
 
 ## Features
 
@@ -30,14 +30,12 @@ A real-time procedural ocean simulation built in Unity using handwritten HLSL.
 
 ## Technical Overview
 
-Explain how the waves are represented and calculated...
+In this project the waves are represented with a generated plane in Unity with a uniform spacing between all vertices. The wave offsets are created with a sum of sines algorithm, but instead of totally random sines, we use stepping amplitude and frequency values to create fractional brownian motion within the waves while also using a random direction. We also create shadows with a lambertian diffuse effect calculated with the normal of the vertex, and specular highlights with the camera direction and its bounce off the normal to the assumed light source position. The fragment shader result is multiplied by a static blue color to give it the recognizable ocean hue.
 
 ## What I Learned
 
 This project has been a great excercise to help push the limits of my understanding of shaders as well as introduce myself to many common real-time visual effects and how they are implemented. Many of these tactics are deceptively simple in description but can vary greatly in complexity depending on implementation.
-
-Explain what you learned about vertex shaders, GPU processing,
-normals, lighting, etc.
+I also used this opportunity to play around with Unity's built in profiling tools to see where the compute was going during any given frame.
 
 ## References
 

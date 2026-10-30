@@ -52,16 +52,22 @@ Shader "Ocean/Basic"
             float _VertexHeight;
 
             // Fragment modifiers
+            int _FragmentWaveCount;
             float _FragmentSeed;
             float _FragmentSeedIter;
+
             float _FragmentFrequency;
             float _FragmentFrequencyMult;
+
             float _FragmentAmplitude;
             float _FragmentAmplitudeMult;
+
             float _FragmentMaxPeak;
             float _FragmentPeakOffset;
+
             float _FragmentInitialSpeed;
             float _FragmentSpeedRamp;
+
             float _FragmentDrag;
             float _FragmentHeight;
 
@@ -141,14 +147,13 @@ Shader "Ocean/Basic"
                     // Spatial Derivative: d(height) / d(x, z)
                     float2 waveSlope = frequency * direction * waveDerivative;
 
+                    // Accumulate vertex height
                     height += wave;
-
                     // Accumulate derivatives for the surface normal
                     derivativeSum += waveSlope;
 
-                    // Progressive domain warping:
-                    // later waves sample a displaced XZ POSITION
-                    samplePosition += -waveSlope * amplitude * _VertexDrag;
+                    // Match the reference's vertex-domain warping
+                    samplePosition += direction * -waveDerivative * amplitude * _VertexDrag;
 
                     amplitudeSum += amplitude;
 
@@ -208,12 +213,100 @@ Shader "Ocean/Basic"
                 return output;
             }
 
+            float3 fragmentFBM(float3 worldPosition) 
+            {
+                float frequency = _FragmentFrequency;
+                float amplitude = _FragmentAmplitude;
+                float speed = _FragmentInitialSpeed;
+                float seed = _FragmentSeed;
+
+                // Fragment waves sample the displaced surface's world position
+                float2 samplePosition = worldPosition.xz;
+
+                float height = 0.0;
+                float2 derivativeSum = float2(0.0, 0.0);
+                float amplitudeSum = 0.0;
+                                
+                for (int i = 0; i < _FragmentWaveCount; i++) 
+                {
+                    // Deterministic direction derived from the seed
+                    // The same settings produce the same directions
+                    float2 direction = normalize(
+                        float2(cos(seed), sin(seed))
+                    );
+
+                    // Angular spatial frequency, in radians per unit
+                    float phase =
+                        dot(direction, samplePosition) * frequency
+                        + _Time.y * speed;
+
+                    float sine = sin(phase);
+                    float cosine = cos(phase);
+
+                    // Euler's Wave
+                    float wave = amplitude
+                        * exp(_FragmentMaxPeak * sine - _FragmentPeakOffset);
+
+                    // Derivative with respect to phase
+                    float waveDerivative = _FragmentMaxPeak * wave * cosine;
+
+                    // Spatial Derivative: d(height) / d(x, z)
+                    float2 waveSlope = frequency * direction * waveDerivative;
+
+                    // Accumulate vertex height
+                    height += wave;
+                    // Accumulate derivatives for the surface normal
+                    derivativeSum += waveSlope;
+
+                    // Match the reference's vertex-domain warping
+                    samplePosition += -waveSlope * amplitude * _FragmentDrag;
+
+                    amplitudeSum += amplitude;
+
+                    // Advance parameters for the next fBm layer
+                    frequency *= _FragmentFrequencyMult;
+                    amplitude *= _FragmentAmplitudeMult;
+                    speed *= _FragmentSpeedRamp;
+                    seed += _FragmentSeedIter;
+                }
+                
+                if (amplitudeSum > 0.00001)
+                {
+                    height /= amplitudeSum;
+                    derivativeSum /= amplitudeSum;
+                }
+
+                // Height is returned for future effects
+                // For now, only the derivatives affect surface shading
+                height *= _FragmentHeight;
+
+                return float3(height, derivativeSum.x, derivativeSum.y);
+            }
+
             /// Fragment Shader
 
             float4 frag(Varyings input) : SV_Target 
             {
                 // normal from vertex shader
-                float3 normal = normalize(input.normal);
+                float3 vertexNormal = normalize(input.normal);
+
+                // Evaluate finer waves at the pixel's world position
+                float3 fragmentWaves = fragmentFBM(
+                    float3(input.worldPosition.x, 0.0, input.worldPosition.z)
+                );
+
+                // Convert the X/Z height derivatives into a normal
+                float3 fragmentNormal = normalize(
+                    float3(-fragmentWaves.y, 1.0, -fragmentWaves.z)
+                );
+
+                // Add the fragment detail to the existing surface normal
+                // A strength of 0 disables detail; 1 applies the full slope
+                float3 normal = normalize(
+                    vertexNormal + (fragmentNormal - float3(0.0, 1.0, 0.0)) * _NormalStrength
+                );
+
+
                 // direction from surface toward the light source
                 float3 lightDir = normalize(_WorldSpaceLightPos0.xyz);
                 // point to camera direction
@@ -227,7 +320,7 @@ Shader "Ocean/Basic"
 
                 // Specular highlight strength
                 float specular = pow(
-                    max(0.0, dot(normalize(input.normal), halfwayDir)),
+                    max(0.0, dot(normal, halfwayDir)),
                     _Shininess
                 );
 
