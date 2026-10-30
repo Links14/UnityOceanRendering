@@ -5,6 +5,7 @@ A real-time procedural ocean simulation built in Unity using handwritten HLSL.
 ## Demo
 
 <video src="./Ocean-Ver-A.0.mp4" width="640" height="220" controls></video>
+![](Ocean-Ver-A.0-Image.png)
 
 ## Features
 
